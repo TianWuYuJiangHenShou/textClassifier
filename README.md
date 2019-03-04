@@ -18,7 +18,7 @@ Pytorch版本：1.0(一开始使用的是pytorch0.4.1,但是在做显存优化�
 
 2、使用NVIDIA的apex进行float16精度混合运算  
 
-main——float_16.py 是加入了apex后进行的修改
+main_float_16.py 是加入了apex后进行的修改
 
 3、使用pytorch1.0的checkpoint特性
 checkpoint通过交换计算内存来工作，并不会存储整个计算图的所有中间激活用于后向传播，而是会在反向传播中重新计算他们
