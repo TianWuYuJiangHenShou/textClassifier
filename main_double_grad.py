@@ -12,6 +12,7 @@ from sklearn import metrics
 import pandas as pd
 import time
 from apex.fp16_utils import FP16_Optimizer
+from torch.utils.checkpoint import checkpoint_sequential
 
 best_score = 0.0
 t1 = time.time()
@@ -26,12 +27,12 @@ def main(**kwargs):
         torch.manual_seed(args.seed)  # set random seed for cpu
 
     train_iter, val_iter, test_iter, args.vocab_size, vectors = data.load_data(args)
-
+    
     global best_score
 
     # init model
     model = getattr(models, args.model)(args, vectors)
-
+    accumulation_steps = 2
     # 模型保存位置
     if not os.path.exists(args.save_dir):
         os.mkdir(args.save_dir)
@@ -64,13 +65,16 @@ def main(**kwargs):
             text, label = batch.text, batch.label
             if args.cuda:
                 text, label = text.cuda(), label.cuda()
-
             optimizer.zero_grad()
+            #pred = checkpoint_sequential(model,5,text)
             pred = model(text)
             loss = criterion(pred, label)
+            loss = loss / accumulation_steps 
             loss.backward()
-            #optimizer.backward(loss)
-            optimizer.step()
+            
+            if idx+1 % accumulation_steps == 0:
+                optimizer.step()
+                model.zero_grad()
 
             # 更新统计指标
             total_loss += float(loss.item())
@@ -92,8 +96,10 @@ def main(**kwargs):
             }
             torch.save(checkpoint, save_path)
             print('Best tmp model f1score: {}'.format(best_score))
+            torch.cuda.empty_cache()
         if f1score < best_score:
             #model.load_state_dict(torch.load(save_path)['state_dict'],map_location={'cuda:1':'cuda:0'})
+            torch.cuda.empty_cache()
             model.load_state_dict(torch.load(save_path)['state_dict'])
             lr1 *= args.lr_decay
             lr2 = 2e-4 if lr2 == 0 else lr2 * 0.8

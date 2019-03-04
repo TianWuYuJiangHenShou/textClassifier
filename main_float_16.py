@@ -45,9 +45,10 @@ def main(**kwargs):
     # 目标函数和优化器
     criterion = F.cross_entropy
     lr1, lr2 = args.lr1, args.lr2
-    #optimizer = torch.optim.Adam(model.parameters(), lr=lr1, betas=(0.9, 0.99))
-    optimizer = model.get_optimizer(lr1, lr2, args.weight_decay)
-    #optimizer = FP16_Optimizer(optimizer, static_loss_scale=128.0)
+#    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr1, betas=(0.9, 0.99))
+#    optimizer = model.get_optimizer(lr1, lr2, args.weight_decay)
+    optimizer = FP16_Optimizer(optimizer, static_loss_scale=128.0)
 
     for i in range(args.max_epochs):
         total_loss = 0.0
@@ -68,8 +69,8 @@ def main(**kwargs):
             optimizer.zero_grad()
             pred = model(text)
             loss = criterion(pred, label)
-            loss.backward()
-            #optimizer.backward(loss)
+            #loss.backward()
+            optimizer.backward(loss)
             optimizer.step()
 
             # 更新统计指标
@@ -92,15 +93,13 @@ def main(**kwargs):
             }
             torch.save(checkpoint, save_path)
             print('Best tmp model f1score: {}'.format(best_score))
-            torch.cuda.empty_cache()
         if f1score < best_score:
             #model.load_state_dict(torch.load(save_path)['state_dict'],map_location={'cuda:1':'cuda:0'})
-            torch.cuda.empty_cache()
             model.load_state_dict(torch.load(save_path)['state_dict'])
             lr1 *= args.lr_decay
             lr2 = 2e-4 if lr2 == 0 else lr2 * 0.8
-            optimizer = model.get_optimizer(lr1, lr2, 0)
-#            optimizer = torch.optim.Adam(model.parameters(), lr=lr1, betas=(0.9, 0.99))
+            #optimizer = model.get_optimizer(lr1, lr2, 0)
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr1, betas=(0.9, 0.99))
             print('* load previous best model: {}'.format(best_score))
             print('* model lr:{}  emb lr:{}'.format(lr1, lr2))
             if lr1 < args.min_lr:
@@ -140,7 +139,7 @@ def test(model, test_data, args):
     result = np.zeros((0,))
     probs_list = []
     with torch.no_grad():
-        for idx, batch in enumerate(test_data):
+        for batch in test_data:
             text = batch.text
             if args.cuda:
                 text = text.cuda()
