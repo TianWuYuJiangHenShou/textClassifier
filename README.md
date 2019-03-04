@@ -19,3 +19,4 @@ Pytorch版本：1.0(一开始使用的是pytorch0.4.1,但是在做显存优化�
 2、使用NVIDIA的apex进行float16精度混合运算  
 
 main.py 是加入了apex后进行的修改
+3、使用pytorch1.0的checkpoint特性
