@@ -11,7 +11,9 @@ import numpy as np
 from sklearn import metrics
 import pandas as pd
 import time
-from apex.fp16_utils import FP16_Optimizer
+
+
+# from apex.fp16_utils import FP16_Optimizer
 
 best_score = 0.0
 t1 = time.time()
@@ -38,16 +40,16 @@ def main(**kwargs):
     save_path = os.path.join(args.save_dir, '{}_{}.pth'.format(args.model, args.id))
 
     if args.cuda:
-#        torch.cuda.set_device(args.device)
+        #        torch.cuda.set_device(args.device)
         torch.cuda.manual_seed(args.seed)  # set random seed for gpu
         model.cuda()
 
     # 目标函数和优化器
     criterion = F.cross_entropy
     lr1, lr2 = args.lr1, args.lr2
-    #optimizer = torch.optim.Adam(model.parameters(), lr=lr1, betas=(0.9, 0.99))
+    # optimizer = torch.optim.Adam(model.parameters(), lr=lr1, betas=(0.9, 0.99))
     optimizer = model.get_optimizer(lr1, lr2, args.weight_decay)
-    #optimizer = FP16_Optimizer(optimizer, static_loss_scale=128.0)
+    # optimizer = FP16_Optimizer(optimizer, static_loss_scale=128.0)
 
     for i in range(args.max_epochs):
         total_loss = 0.0
@@ -66,10 +68,12 @@ def main(**kwargs):
                 text, label = text.cuda(), label.cuda()
 
             optimizer.zero_grad()
+            # pred = checkpoint_sequential(model,5,text)
             pred = model(text)
             loss = criterion(pred, label)
             loss.backward()
-            #optimizer.backward(loss)
+            # optimizer.backward(loss)
+
             optimizer.step()
 
             # 更新统计指标
@@ -92,15 +96,13 @@ def main(**kwargs):
             }
             torch.save(checkpoint, save_path)
             print('Best tmp model f1score: {}'.format(best_score))
-            torch.cuda.empty_cache()
         if f1score < best_score:
-            #model.load_state_dict(torch.load(save_path)['state_dict'],map_location={'cuda:1':'cuda:0'})
-            torch.cuda.empty_cache()
+            # model.load_state_dict(torch.load(save_path)['state_dict'],map_location={'cuda:1':'cuda:0'})
             model.load_state_dict(torch.load(save_path)['state_dict'])
             lr1 *= args.lr_decay
             lr2 = 2e-4 if lr2 == 0 else lr2 * 0.8
             optimizer = model.get_optimizer(lr1, lr2, 0)
-#            optimizer = torch.optim.Adam(model.parameters(), lr=lr1, betas=(0.9, 0.99))
+            #            optimizer = torch.optim.Adam(model.parameters(), lr=lr1, betas=(0.9, 0.99))
             print('* load previous best model: {}'.format(best_score))
             print('* model lr:{}  emb lr:{}'.format(lr1, lr2))
             if lr1 < args.min_lr:
@@ -140,19 +142,21 @@ def test(model, test_data, args):
     result = np.zeros((0,))
     probs_list = []
     with torch.no_grad():
-        for idx, batch in enumerate(test_data):
+        for idx,batch in enumerate(test_data):
             text = batch.text
             if args.cuda:
                 text = text.cuda()
-            outputs = model(text)
+            outputs = model(text)#返回的是一个19列的矩阵对应每个列的分数
+            #softmax    将输出映射为0-1之间的实数，并且归一化保证和为1，这时每个数表示当前分类的概率，其下标可对应为label-1
             probs = F.softmax(outputs, dim=1)
             probs_list.append(probs.cpu().numpy())
+            #Torch max()  返回有2个(最大值，最大值的索引) 需要的是索引即 label-1
             pred = outputs.max(1)[1]
             result = np.hstack((result, pred.cpu().numpy()))
 
-    # 生成概率文件npy
+    # 生成概率文件npy   用于模型融合
     prob_cat = np.concatenate(probs_list, axis=0)
-    test = pd.read_csv(os.path.abspath('.')+'/data/raw_data/test_set.csv')
+    test = pd.read_csv(os.path.abspath('.') + '/data/raw_data/test_set.csv')
     test_id = test['id'].copy()
     test_pred = pd.DataFrame({'id': test_id, 'class': result})
     test_pred['class'] = (test_pred['class'] + 1).astype(int)
@@ -190,4 +194,3 @@ def val(model, dataset, args):
 
 if __name__ == '__main__':
     fire.Fire()
-
