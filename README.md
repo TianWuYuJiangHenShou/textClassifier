@@ -32,3 +32,5 @@ https://www.zhihu.com/question/274635237/answer/582278076?utm_source=wechat_sess
 
 pytorch checkpoint源码参考：
 https://pytorch.org/docs/master/_modules/torch/utils/checkpoint.html#checkpoint
+
+ps:尝试了checkpoint与inplace_abn的组合使用，前期效果较好，后期模型渐渐饱和后，参数量剧增，很快就out of memory
