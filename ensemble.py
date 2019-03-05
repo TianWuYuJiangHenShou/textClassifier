@@ -11,7 +11,6 @@ dl_res = pre_res / len(mlist)
 
 n_dl = np.load('n_dl3.npy')
 
-# svm_res = np.load('ensemble_lgb_svc_preds2.npy')
 svm_res = np.load('ensemble_lgb_svc_preds10.npy')
 all_res = 0.9*dl_res + svm_res + 0.9*n_dl
 
@@ -20,10 +19,10 @@ all_res = 0.9*dl_res + svm_res + 0.9*n_dl
 
 res = np.argmax(all_res, axis=1)
 
-test = pd.read_csv('/data/yujun/datasets/daguanbei_data/test_set.csv')
+test = pd.read_csv('../data/raw_data/test_set.csv')
 test_id = test['id'].copy()
 
 test_pred = pd.DataFrame({'id': test_id, 'class': res})
 test_pred['class'] = (test_pred['class']+1).astype(int)
-test_pred[['id', 'class']].to_csv('esb_3.csv', index=None)
+test_pred[['id', 'class']].to_csv('ens_3.csv', index=None)
 print('ensemble csv saved in {}'.format('esb_3.csv'))
